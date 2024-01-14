@@ -5,7 +5,9 @@ const ejs=require("ejs");
 const bodyParser=require("body-parser");
 const mongoose=require("mongoose");
 //const encrypt=require("mongoose-encryption");for level 2 encryption
-const md5=require("md5");
+//const md5=require("md5");       ----->*used for level 3 authentication *<--------
+const bcrypt=require("bcrypt");
+const saltRounds=10;
 
 const app=express();
 app.use(express.static("public"));
@@ -35,13 +37,15 @@ app.get("/register",(req,res)=>{
 });
 app.post("/register",(req,res)=>{
     const username=req.body.username;
-    const password=md5(req.body.password);
-
+    const password=req.body.password;
     if (!password) {
-        console.log("Password is required");
+         console.log("Password is required");
+         //alert("passowrd required");---->it will not work on the node (for sending the message we have to use flash messages)
         return res.redirect("/register");
     }
-
+    bcrypt.hash(password, saltRounds, function(err, hash) {
+        // Store hash in your password DB.
+        
     const newUser=new User({
         email:username,
         password:password
@@ -54,6 +58,8 @@ app.post("/register",(req,res)=>{
         console.log(err);
     });
 });
+    });
+    
 // ****************** MongooseError: Model.findOne() no longer accepts a callback******************
 
 // app.post("/login", (req, res) => {
@@ -89,10 +95,16 @@ app.post("/login", async (req, res) => {
         
         const foundUser = await User.findOne({ email: username });//here by this command by looking at email we locate the document in the datbase
         if (foundUser) {
+            bcrypt.compare(password,foundUser.password, function(err, result) {
+                // result == true
+                if (result) {
+                    res.render("secrets");  
+                } else {
+                    res.redirect("/login"); 
+                }
+            });
            
             if (foundUser.password === password) {
-                console.log(foundUser.password);//By doing the console.log() we can find the password the way the mongoose-encrypt work it will encrypt when you call save and it will decrypt when you call find
-                
                 res.render("secrets");  
             } else {
                 res.redirect("/login"); 
@@ -106,6 +118,9 @@ app.post("/login", async (req, res) => {
         res.redirect("/login");  
     }
 });
+app.get("/logout",(req,res)=>{
+    res.render("home");
+})
 
 app.listen(3000,function(){
     console.log("server started on port 3000:")
